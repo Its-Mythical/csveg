@@ -1,0 +1,21 @@
+# CVSegNet -- dependencies
+# CPU-only install (default). For a CUDA GPU, install torch/torchvision
+# from https://pytorch.org first and skip the first two lines here.
+torch>=2.0
+torchvision>=0.15
+
+# web app
+fastapi>=0.110
+uvicorn>=0.27
+python-multipart>=0.0.9
+
+# imaging / data
+pillow>=10.0
+numpy>=1.24
+
+# instance post-processing (watershed + peak finding)
+scipy>=1.10
+scikit-image>=0.22
+
+# tests (starlette test client for test_all.py)
+httpx>=0.27
