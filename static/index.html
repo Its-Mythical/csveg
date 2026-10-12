@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CVSegNet — instance segmentation</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>CVSegNet</h1>
+    <p class="sub">Proposal-free instance segmentation — foreground + centre + boundary heads, split by a boundary-aware watershed.</p>
+    <div id="status" class="status">checking model…</div>
+  </header>
+
+  <main>
+    <section class="controls">
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" hidden />
+        <span>Drop an image or click to choose</span>
+      </label>
+      <div class="sliders">
+        <label>fg threshold <input type="range" id="fg_thr" min="0.1" max="0.9" step="0.05" value="0.5"><output id="fg_out">0.50</output></label>
+        <label>centre threshold <input type="range" id="ctr_thr" min="0.05" max="0.8" step="0.05" value="0.35"><output id="ctr_out">0.35</output></label>
+        <label>boundary weight <input type="range" id="bnd_weight" min="0" max="1.5" step="0.1" value="0.7"><output id="bnd_out">0.70</output></label>
+        <label>min area <input type="range" id="min_area" min="10" max="400" step="10" value="40"><output id="area_out">40</output></label>
+      </div>
+      <button id="go" disabled>Segment</button>
+    </section>
+
+    <section class="viewer">
+      <div class="panel">
+        <h2>Input</h2>
+        <img id="input_img" alt="" />
+      </div>
+      <div class="panel">
+        <h2>Instances <span id="count"></span></h2>
+        <div class="stack">
+          <img id="base_img" alt="" />
+          <img id="overlay_img" alt="" />
+        </div>
+      </div>
+    </section>
+
+    <section class="results">
+      <table id="inst_table">
+        <thead><tr><th>id</th><th>colour</th><th>area</th><th>bbox (x,y,w,h)</th><th>score</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
