@@ -1,29 +1,28 @@
 # CVSegNet - model report
 
-_Generated 2026-10-13 16:01_
+_Generated 2026-10-13 21:11_
 
 > Hardware-capacity details (RAM, VRAM, core count) are intentionally omitted; the model runs on CPU or CUDA and the report is device-agnostic.
 
 ## 1. Summary
 
-Evaluated the checkpoint `cvseg_unet.pt` on 30 held-out images. It was trained to epoch 36 (its own val fg-IoU 0.382).
+Evaluated the checkpoint `cvseg_unet.pt` on 30 held-out images. It was trained to epoch 37 (its own val fg-IoU 0.584).
 
-- **Foreground IoU: 0.480** (0 = nothing, 1 = perfect)
-- **Instance count exactly right on 0%** of images, within +/-1 on 7% (mean absolute error 9.50)
+- **Foreground IoU: 0.607** (0 = nothing, 1 = perfect)
+- **Instance count exactly right on 3%** of images, within +/-1 on 17% (mean absolute error 7.77)
 - **Merge rate on multi-object images: 0%** (21 such images)
-- Mean instance confidence: 0.903
-- **Tends to over-segment**: 12.0 instances predicted vs 2.5 true on average - raise `ctr_thr` / `min_area`, or train longer
+- Mean instance confidence: 0.942
 
 ## 2. Model
 
 | property | value |
 |---|---|
-| backbone | resnet18 |
-| decoder width | 1.0x |
+| backbone | resnet50 |
+| decoder width | 1.5x |
 | output stride | 2 |
-| parameters | 12.06 M (12.06 M trainable) |
+| parameters | 25.91 M (25.91 M trainable) |
 | heads | foreground + instance-centre + boundary |
-| inference size used here | 192px |
+| inference size used here | 256px |
 
 ## 3. Capability checks
 

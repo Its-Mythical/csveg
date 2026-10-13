@@ -61,7 +61,7 @@ FIXES = [
     ("Web app", "deprecated startup hook; model could fail to load",
      "lifespan + lazy load, so the API works regardless of startup timing"),
     ("Tooling", "manual pip installs",
-     "install_requirements.py (venv-safe), test_all.py (27 checks), benchmark.py"),
+     "install_requirements.py (venv-safe), test_all.py (28 checks), benchmark.py"),
 ]
 
 WORK = [
@@ -241,7 +241,7 @@ def build_report(model, cfg, metrics, checks, ckpt_used, ckpt_meta, size, args):
     L.append("```bash")
     L.append("python install_requirements.py          # dependencies")
     L.append("python train.py --size 256 --batch 1 --grad-accum 8 --amp")
-    L.append("python test_all.py                      # 27 self-checks")
+    L.append("python test_all.py                      # 28 self-checks")
     L.append("python benchmark.py --models light large --epochs 3")
     L.append("python report.py                        # this report")
     L.append("```")
