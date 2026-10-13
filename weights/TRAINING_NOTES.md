@@ -27,3 +27,17 @@ python train.py --size 256 --batch 1 --grad-accum 8 --amp   # default resnet50 c
 ```
 
 The result is written to `weights/cvseg_unet.pt`.
+
+## Resume checkpoint (`weights/resume/`)
+
+`cvseg_last.pt` is the epoch-40 training state (model + optimizer + scheduler + RNG, 145 MB).
+It is over GitHub's 100 MB file limit, so it is stored as two parts. Rejoin and verify:
+
+```bash
+cat weights/resume/cvseg_last.pt.part* > weights/cvseg_last.pt
+sha256sum weights/cvseg_last.pt
+# expect 060f03de7cee99dde02db436dc85a0b45f0bd53ad34c65364c280a6da9d7c924
+```
+
+Use it with `train.py` only if you keep the same config (`--backbone resnet18 --decoder-width 1.0`).
+Note `weights/cvseg_best.pt` is not included: it holds the same weights as `cvseg_unet.pt`.
