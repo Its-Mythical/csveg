@@ -70,8 +70,8 @@ gc.collect()
 print("\n== 3. dataset discovery ==")
 items = gather_items(HERE)
 names = sorted({it[2] for it in items})
-check("finds both bundled datasets", set(names) == {"penn", "coco_seg"}, f"{names}")
-check("298 images", len(items) == 298, f"({len(items)})")
+check("finds all bundled datasets", set(names) == {"penn", "coco_seg", "package", "carparts", "balloon"}, f"{names}")
+check("872 images", len(items) == 872, f"({len(items)})")
 ds = InstanceMaskDataset(items[:4], 128, train=False)   # deterministic (no random crop)
 x, fg, ctr, bnd = ds[0]
 check("dataset sample shapes", x.shape == (3, 128, 128) and fg.shape == (1, 128, 128)
@@ -175,10 +175,13 @@ print("\n== 7. web app endpoint ==")
 try:
     gc.collect()
     os.environ["CVSEG_IMG_SIZE"] = "128"
+    import tempfile
+    # use a throw-away checkpoint + no post-processing file; never touch weights/cvseg_unet.pt
+    ck = os.path.join(tempfile.mkdtemp(prefix="cvseg_test_"), "cvseg_test.pt")
+    os.environ["CVSEG_WEIGHTS"] = ck
+    os.environ["CVSEG_POSTPROC"] = os.path.join(os.path.dirname(ck), "none.json")
     from fastapi.testclient import TestClient
     import app as appmod
-    # give it a checkpoint to load
-    ck = os.path.join(HERE, "weights", "cvseg_unet.pt")
     torch.save({"model": CVSegNet(pretrained=False).state_dict(),
                 "backbone": "resnet18", "decoder_width": 1.0}, ck)
     with TestClient(appmod.app) as client:

@@ -12,13 +12,17 @@ cvseg/
 ├── benchmark.py      Compare model sizes on the same split (measures only)
 ├── prepare_data.py   Convert / download datasets into the expected layout
 ├── install_requirements.py  Auto-install requirements.txt (CPU/GPU torch)
-├── test_all.py       Self-test: model, data, post-processing, app (28 checks)
+├── test_all.py       Self-test: model, data, post-processing, app (30 checks)
+├── report.py         Prints what was fixed / what is still open, with live checks
+├── tools/            eval_ap.py (COCO-style AP + tuner), add_datasets.py,
+│                     get_backbone_weights.py, training logs
 ├── requirements.txt
 ├── static/           Front-end (index.html, app.js, style.css)
-├── weights/          Trained weights land here (cvseg_best.pt, cvseg_unet.pt)
+├── weights/          cvseg_unet.pt (default), cvseg_improved.pt, postproc*.json, eval_*.json
 └── data/             Bundled training data
     ├── penn/PennFudanPed/   PNGImages + PedMasks   (170 images, pedestrians)
-    └── coco_seg/            images  + masks        (128 images, varied objects)
+    ├── coco_seg/            images  + masks        (128 images, varied objects)
+    ├── package/ carparts/ balloon/                 (250 / 250 / 74 images)
 ```
 
 ---
@@ -34,12 +38,20 @@ data/<name>/masks/<stem>.png       8-bit PNG, one integer id per object (0 = bg)
 ```
 
 `train.py` auto-discovers every `data/<name>/{images,masks}` folder and trains on
-all of them (or pick with `--datasets`). Two datasets are **bundled**:
+all of them (or pick with `--datasets`). Five datasets are **bundled**:
 
 | dataset | images | instances | subjects |
 |---|---|---|---|
 | Penn-Fudan (`penn`) | 170 | 345 | pedestrians |
 | COCO-Seg subset (`coco_seg`) | 128 | 929 | varied objects |
+| Package segmentation (`package`) | 250 | — | parcels / boxes |
+| Car parts (`carparts`) | 250 | — | car body parts |
+| Balloon (`balloon`) | 74 | — | balloons |
+
+`package`, `carparts` and `balloon` are public Roboflow / Ultralytics YOLO-seg datasets, sampled
+and converted by `tools/add_datasets.py` (re-run it to rebuild them; check each dataset's own
+licence before redistributing). Note the annotation conventions differ ("a car part" is not
+"an object" in the COCO sense), which limits what one class-agnostic model can learn from the mix.
 
 ### Adding more
 
@@ -73,6 +85,28 @@ COCO-format or YOLO-seg mirror works via `prepare_data.py coco-seg`.
 | **checkpoints** | overwrote `cvseg_unet.pt` every epoch | keeps **best** at `cvseg_best.pt`, publishes to `cvseg_unet.pt` |
 | **data** | one hard-coded dataset | **multi-dataset**, auto-discovered, plus download/conversion tooling |
 | **app/train mismatch** | app 160px, training 192px | both default to the same size |
+| **centre target (bug)** | sigma was passed the *image size* (192), so the target was >=0.76 everywhere | adaptive per-object sigma |
+| **BN when not pretrained** | BN always frozen | trained automatically when there are no pretrained weights |
+| **pretrained weights** | download had to reach pytorch.org | local `--backbone-weights` / `CVSEG_BACKBONE_WEIGHTS`, `tools/get_backbone_weights.py`; clear fallback + warning |
+| **instance embedding** | none | optional `--embed-dim N` head + discriminative loss; `hybrid` / `embedding` post-processing modes |
+| **evaluation** | foreground IoU only | `tools/eval_ap.py`: pycocotools AP, size x TTA sweep, cross-fitted post-processing tuner |
+| **TTA** | single flip, hard-coded | `tta` = `none` / `h` / `hv`, per-request in the API |
+| **losses under AMP** | computed in the autocast dtype | always float32 (CPU bf16 check passes; GPU fp16 path unverified) |
+
+### Measured outcome (honest version)
+
+On the same 60 held-out images, class-agnostic instance AP (percent), tuned and cross-fitted:
+
+| | `cvseg_unet.pt` (default) | `cvseg_improved.pt` |
+|---|---|---|
+| foreground IoU | 0.375 | **0.436** |
+| AP50 | **6.2** | 3.8 |
+| AP @ [.5:.95] | ~0 | ~0 |
+
+The improved recipe makes **better foreground masks but did not improve instance quality**; the
+original-recipe checkpoint recalls about twice as many instances, so it stays the default. Both are
+weak instance segmenters (tiny, heterogeneous training set; 60-image validation). Details,
+caveats and reproduction commands are in [`weights/TRAINING_NOTES.md`](weights/TRAINING_NOTES.md).
 
 ---
 
@@ -187,7 +221,7 @@ Returns `{count, instances:[{id, area, bbox, score, color}], overlay}`.
 ## Tests
 
 ```bash
-python test_all.py        # 28 checks: model, data, post-processing, app
+python test_all.py        # 30 checks: model, data, post-processing, app
 ```
 
 Covers: forward on odd / non-square sizes (light + large), that gradient
@@ -198,24 +232,23 @@ web-app endpoints.
 
 ## Verification
 
-The default (resnet50, ~26 M trainable) config was run on the bundled data on a
-2 GB / 2-core machine: it trains (loss 3.00, val foreground IoU 0.29 after one
-epoch — versus ~0.14 for the old untrained path) and the full predict →
-boundary-watershed → instances path runs. The multi-dataset loader was verified
-to find all 298 bundled images (penn 170 + coco_seg 128) and train a batch. That
-host is too small to train to convergence, so **train it on your machine**.
-
-No weights are shipped (the architecture changed, so an old checkpoint would not
-load) — run `train.py` once and the app comes alive.
+`python test_all.py` passes 30/30 on a 2-core CPU (it needs the pretrained ResNet-18 file, or it
+falls back to random init with a warning). Both shipped checkpoints load in the web app and
+return instances end to end. Quality numbers are in the *Measured outcome* table above and in
+`weights/eval_*.json`; GPU mixed precision (`--amp`) has not been run here.
 
 ---
 
 ## Notes & limitations
 
-- Class-agnostic: it segments "objects", not categories. The COCO-Seg subset is
-  therefore treated as generic foreground, not 80 classes.
-- Trained on pedestrians + varied objects; retrain for a specific domain.
-- The boundary head fixes most touching-object merges, but **almost fully
-  overlapping** objects can still merge — inherent to watershed.
-- `val_IoU` is foreground IoU on a held-out slice; it is noisy, so trust the
-  loss trend and eyeball the masks.
+- Class-agnostic: it segments "objects", not categories. The COCO-Seg subset is therefore
+  treated as generic foreground, not 80 classes. (Not changed.)
+- Instance quality is **low** (AP50 about 4-6 %, strict AP ~0 on 60 held-out images); the model is
+  trained from a ResNet-18 ImageNet init on 812 images. More, more consistent data and a GPU run
+  of the default resnet50 config are the real next step.
+- Near-fully-overlapping objects still merge (inherent to watershed). The optional embedding head
+  helps only in `hybrid` mode and did not beat plain watershed after tuning.
+- Test-time augmentation is available (`tta`) but off by default: 1-flip is ~1.7x slower for
+  ~+0.1 AP50, 4-flip was worse.
+- `val_IoU` and AP are measured on a small held-out slice and the post-processing was tuned on
+  the same slice, so treat every number as approximate.

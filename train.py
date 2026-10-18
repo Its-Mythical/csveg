@@ -51,7 +51,7 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 
 from model import (CVSegNet, build_boundary_target, build_center_target,
-                   cvseg_loss)
+                   cvseg_loss, discriminative_loss)
 
 torch.set_num_threads(2)
 
@@ -59,6 +59,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 W_DIR = os.path.join(ROOT, "weights")
 LAST = os.path.join(W_DIR, "cvseg_last.pt")
 BEST = os.path.join(W_DIR, "cvseg_best.pt")
+FINAL = os.path.join(W_DIR, "cvseg_final.pt")
 PUBLISH = os.path.join(W_DIR, "cvseg_unet.pt")
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 STD = np.array([0.229, 0.224, 0.225], np.float32)
@@ -101,10 +102,18 @@ def gather_items(root: str, datasets=None):
 
 
 class InstanceMaskDataset(Dataset):
-    def __init__(self, items, size=192, train=True):
+    """Yields (image, fg, centre, boundary) - plus the instance-id map as a 5th item when
+    ``with_inst`` is set (needed for the embedding loss).
+
+    ctr_sigma: Gaussian sigma (pixels at training resolution) for the centre target;
+    ``None`` / 0 = adaptive per object size (recommended)."""
+
+    def __init__(self, items, size=192, train=True, with_inst=False, ctr_sigma=None):
         self.items = items
         self.size = size
         self.train = train
+        self.with_inst = with_inst
+        self.ctr_sigma = ctr_sigma or None
 
     def __len__(self):
         return len(self.items)
@@ -155,8 +164,13 @@ class InstanceMaskDataset(Dataset):
         x = (x - MEAN) / STD
         x = torch.from_numpy(x).permute(2, 0, 1).float()
         fg = torch.from_numpy((inst > 0).astype(np.float32))[None]
-        ctr = torch.from_numpy(build_center_target(inst, self.size))[None]
+        # NB: the second argument of build_center_target is the Gaussian sigma in pixels. It
+        # used to be passed `self.size` (the image size), which made the target ~1 everywhere.
+        ctr = torch.from_numpy(build_center_target(inst, self.ctr_sigma,
+                                                   adaptive=self.ctr_sigma is None))[None]
         bnd = torch.from_numpy(build_boundary_target(inst))[None]
+        if self.with_inst:
+            return x, fg, ctr, bnd, torch.from_numpy(inst.astype(np.int64))
         return x, fg, ctr, bnd
 
 
@@ -165,9 +179,8 @@ def evaluate(model, loader):
     model.eval()
     dev = next(model.parameters()).device          # move val data to the model's device
     inter = union = 0.0
-    for x, fg, _, _ in loader:
-        x = x.to(dev)
-        fg = fg.to(dev)
+    for batch in loader:
+        x, fg = batch[0].to(dev), batch[1].to(dev)
         p = torch.sigmoid(model(x)[0]) > 0.5
         t = fg > 0.5
         inter += (p & t).sum().item()
@@ -201,7 +214,14 @@ def _restore_rng(state):
 def _config_meta(args):
     return {"backbone": args.backbone, "decoder_width": args.decoder_width,
             "size": args.size, "grad_accum": args.grad_accum,
-            "freeze_at": args.freeze_at}
+            "freeze_at": args.freeze_at, "embed_dim": getattr(args, "embed_dim", 0)}
+
+
+def _publish_meta(model, args, epoch, best, iou):
+    """The dict stored in cvseg_best.pt / cvseg_unet.pt / cvseg_final.pt (what app.py loads)."""
+    return {"model": model.state_dict(), "epoch": epoch, "best": best, "val_iou": iou,
+            "backbone": args.backbone, "decoder_width": args.decoder_width,
+            "embed_dim": args.embed_dim, "train_size": args.size}
 
 
 def save_checkpoint(path, model, opt, scaler, sched, epoch, batch_in_epoch,
@@ -234,6 +254,24 @@ def main():
     ap.add_argument("--freeze-at", type=int, default=2,
                     help="freeze early encoder stages (0..4)")
     ap.add_argument("--amp", action="store_true")
+    ap.add_argument("--threads", type=int, default=2, help="CPU threads for torch")
+    ap.add_argument("--backbone-weights", default=None,
+                    help="path to a local ImageNet state-dict for the backbone "
+                         "(see tools/get_backbone_weights.py); used instead of the download")
+    ap.add_argument("--encoder-lr-mult", type=float, default=1.0,
+                    help="learning-rate multiplier for the pretrained encoder (e.g. 0.1)")
+    ap.add_argument("--pretrained", action=argparse.BooleanOptionalAction, default=True,
+                    help="ImageNet-pretrained backbone (falls back to random init, with a "
+                         "warning, if the weights cannot be downloaded)")
+    ap.add_argument("--train-bn", action=argparse.BooleanOptionalAction, default=None,
+                    help="train BatchNorm layers (default: only when the backbone is not "
+                         "pretrained)")
+    ap.add_argument("--embed-dim", type=int, default=0,
+                    help=">0 adds a pixel-embedding head + discriminative loss to help split "
+                         "touching objects")
+    ap.add_argument("--emb-weight", type=float, default=0.5, help="weight of the embedding loss")
+    ap.add_argument("--ctr-sigma", type=float, default=0.0,
+                    help="centre-target sigma in pixels; 0 = adaptive to object size")
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--datasets", nargs="*", default=None)
     ap.add_argument("--n-val", type=int, default=20)
@@ -246,6 +284,7 @@ def main():
                     help="'auto' | 'none' | path to a checkpoint")
     args = ap.parse_args()
 
+    torch.set_num_threads(args.threads)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(W_DIR, exist_ok=True)
     random.seed(args.seed)
@@ -269,7 +308,8 @@ def main():
     # a seeded generator makes the per-epoch data order reproducible, which is
     # what lets us skip already-done batches on resume
     gen = torch.Generator()
-    train_ds = InstanceMaskDataset(train_items, args.size, True)
+    train_ds = InstanceMaskDataset(train_items, args.size, True,
+                                   with_inst=args.embed_dim > 0, ctr_sigma=args.ctr_sigma)
     train_dl = DataLoader(train_ds, batch_size=args.batch, shuffle=True,
                           num_workers=args.workers, drop_last=True, generator=gen)
     val_dl = DataLoader(InstanceMaskDataset(val_items, args.size, False),
@@ -279,15 +319,27 @@ def main():
         raise SystemExit("no training batches - dataset smaller than --batch?")
     print(f"batches/epoch={batches_per_epoch} grad_accum={args.grad_accum}", flush=True)
 
-    model = CVSegNet(pretrained=True, backbone=args.backbone,
+    model = CVSegNet(pretrained=(args.backbone_weights or args.pretrained),
+                     backbone=args.backbone,
                      decoder_width=args.decoder_width,
-                     checkpoint=args.checkpoint, freeze_at=args.freeze_at).to(device)
+                     checkpoint=args.checkpoint, freeze_at=args.freeze_at,
+                     train_bn=args.train_bn, embed_dim=args.embed_dim).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"model: {args.backbone} width={args.decoder_width} "
-          f"| {n_params/1e6:.2f} M trainable params | amp={args.amp}", flush=True)
+          f"| {n_params/1e6:.2f} M trainable params | amp={args.amp} "
+          f"| pretrained={model.pretrained} train_bn={model.train_bn} "
+          f"embed_dim={model.embed_dim}", flush=True)
 
-    opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
-                            lr=args.lr, weight_decay=1e-4)
+    enc_ids = {id(p) for blk in (model.stem, model.layer1, model.layer2, model.layer3,
+                                 model.layer4) for p in blk.parameters()}
+    enc = [p for p in model.parameters() if p.requires_grad and id(p) in enc_ids]
+    rest = [p for p in model.parameters() if p.requires_grad and id(p) not in enc_ids]
+    if enc and args.encoder_lr_mult != 1.0:
+        groups = [{"params": rest, "lr": args.lr},
+                  {"params": enc, "lr": args.lr * args.encoder_lr_mult}]
+    else:                                            # single group: same as the original
+        groups = [{"params": rest + enc, "lr": args.lr}]
+    opt = torch.optim.AdamW(groups, lr=args.lr, weight_decay=1e-4)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
     total = args.epochs
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=total)
@@ -315,6 +367,10 @@ def main():
                 f"checkpoint decoder_width={meta['decoder_width']} != "
                 f"{args.decoder_width}; use --decoder-width {meta['decoder_width']} "
                 f"or --resume none.")
+        if meta.get("embed_dim", 0) != args.embed_dim:
+            raise SystemExit(
+                f"checkpoint embed_dim={meta.get('embed_dim', 0)} != {args.embed_dim}; "
+                f"use --embed-dim {meta.get('embed_dim', 0)} or --resume none.")
         if meta.get("size") and meta["size"] != args.size:
             print(f"  note: resuming with --size {args.size} "
                   f"(checkpoint used {meta['size']})", flush=True)
@@ -344,14 +400,20 @@ def main():
             ep_loss = 0.0
             ep_batches = 0
             opt.zero_grad(set_to_none=True)
-            for step, (x, fg, ctr, bnd) in enumerate(train_dl):
+            for step, batch in enumerate(train_dl):
                 if epoch == start_epoch and step < resume_batches:
                     continue                          # already trained this epoch
-                x = x.to(device)
-                fg, ctr, bnd = fg.to(device), ctr.to(device), bnd.to(device)
+                x, fg, ctr, bnd = (t.to(device) for t in batch[:4])
                 with torch.amp.autocast("cuda", enabled=args.amp and device.type == "cuda"):
-                    fg_l, ctr_l, bnd_l = model(x)
+                    if args.embed_dim > 0:
+                        fg_l, ctr_l, bnd_l, emb = model(x, return_embed=True)
+                    else:
+                        fg_l, ctr_l, bnd_l = model(x)
                     losses = cvseg_loss(fg_l, ctr_l, bnd_l, fg, ctr, bnd)
+                    if args.embed_dim > 0:
+                        f = batch[4].shape[-1] // emb.shape[-1]        # embedding is at stride 2
+                        l_emb = discriminative_loss(emb, batch[4][:, ::f, ::f].to(device))
+                        losses["total"] = losses["total"] + args.emb_weight * l_emb
                     loss = losses["total"] / args.grad_accum
                 scaler.scale(loss).backward()
                 ep_loss += float(losses["total"].detach())
@@ -378,10 +440,7 @@ def main():
                         iou = evaluate(model, val_dl)
                         if iou > best:
                             best = iou
-                            meta = {"model": model.state_dict(), "epoch": epoch,
-                                    "best": best, "val_iou": iou,
-                                    "backbone": args.backbone,
-                                    "decoder_width": args.decoder_width}
+                            meta = _publish_meta(model, args, epoch, best, iou)
                             torch.save(meta, BEST)
                             torch.save(meta, PUBLISH)
                             print(f"  [best] val_fgIoU {iou:.4f} -> {PUBLISH}", flush=True)
@@ -412,11 +471,12 @@ def main():
             save_checkpoint(LAST, model, opt, scaler, sched, epoch + 1, 0,
                             global_step, best, args)
             if is_best:
-                meta = {"model": model.state_dict(), "epoch": epoch + 1,
-                        "best": best, "val_iou": iou, "backbone": args.backbone,
-                        "decoder_width": args.decoder_width}
+                meta = _publish_meta(model, args, epoch + 1, best, iou)
                 torch.save(meta, BEST)
                 torch.save(meta, PUBLISH)
+            # weights of the most recent epoch (val IoU is a noisy / coarse selector, so keep
+            # the final model too and compare both with tools/eval_ap.py)
+            torch.save(_publish_meta(model, args, epoch + 1, best, iou), FINAL)
             if time.time() - t0 > args.max_seconds:
                 print(f"time budget reached after epoch {epoch+1}; checkpoint saved",
                       flush=True)

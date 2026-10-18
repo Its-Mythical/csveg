@@ -1,0 +1,98 @@
+{
+  "objective": "AP50",
+  "checkpoint": "cvseg_best.pt",
+  "n_val": 60,
+  "n_instances": 263,
+  "size_tta": [
+    {
+      "size": 192,
+      "tta": "none",
+      "ms_per_image": 52,
+      "AP": 0.0,
+      "AP50": 0.0041,
+      "AP75": 0.0003,
+      "AR": 0.0513
+    },
+    {
+      "size": 320,
+      "tta": "none",
+      "ms_per_image": 97,
+      "AP": 0.0,
+      "AP50": 0.0084,
+      "AP75": 0.001,
+      "AR": 0.0958
+    }
+  ],
+  "chosen": {
+    "size": 320,
+    "tta": "none"
+  },
+  "default_postproc": {
+    "AP": 0.0,
+    "AP50": 0.0084,
+    "AP75": 0.001,
+    "AR": 0.0958
+  },
+  "tuned_in_sample": {
+    "AP": 0.0,
+    "AP50": 0.055,
+    "AP75": 0.0072,
+    "AR": 0.0928
+  },
+  "tuned_cross_fitted": {
+    "AP": 0.0,
+    "AP50": 0.0624,
+    "AP75": 0.006,
+    "AR": 0.0791
+  },
+  "final_params": {
+    "size": 320,
+    "tta": "none",
+    "mode": "watershed",
+    "fg_thr": 0.5,
+    "ctr_thr": 0.35,
+    "bnd_weight": 0.7,
+    "min_distance": 11,
+    "min_area": 80,
+    "emb_weight": 1.0,
+    "emb_spatial": 5.0,
+    "score": "fg"
+  },
+  "per_dataset": {
+    "balloon": {
+      "images": 3,
+      "AP": 0.0,
+      "AP50": 0.1914,
+      "AP75": 0.0,
+      "AR": 0.0667
+    },
+    "carparts": {
+      "images": 17,
+      "AP": 0.0,
+      "AP50": 0.019,
+      "AP75": 0.0054,
+      "AR": 0.0835
+    },
+    "coco_seg": {
+      "images": 11,
+      "AP": 0.0,
+      "AP50": 0.0157,
+      "AP75": 0.004,
+      "AR": 0.0293
+    },
+    "package": {
+      "images": 14,
+      "AP": 0.0,
+      "AP50": 0.2671,
+      "AP75": 0.0316,
+      "AR": 0.1646
+    },
+    "penn": {
+      "images": 15,
+      "AP": 0.0,
+      "AP50": 0.0905,
+      "AP75": 0.0224,
+      "AR": 0.1525
+    }
+  }
+}

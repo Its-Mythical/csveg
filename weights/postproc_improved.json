@@ -1,0 +1,13 @@
+{
+  "size": 320,
+  "tta": "none",
+  "mode": "hybrid",
+  "fg_thr": 0.65,
+  "ctr_thr": 0.5,
+  "bnd_weight": 0.3,
+  "min_distance": 11,
+  "min_area": 80,
+  "emb_weight": 0.5,
+  "emb_spatial": 5.0,
+  "score": "mix"
+}

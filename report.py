@@ -61,24 +61,25 @@ FIXES = [
     ("Web app", "deprecated startup hook; model could fail to load",
      "lifespan + lazy load, so the API works regardless of startup timing"),
     ("Tooling", "manual pip installs",
-     "install_requirements.py (venv-safe), test_all.py (27 checks), benchmark.py"),
+     "install_requirements.py (venv-safe), test_all.py (30 checks), benchmark.py, tools/eval_ap.py"),
+    ("Centre target", "sigma was the image size, so the target was ~flat",
+     "adaptive per-object sigma"),
 ]
 
 WORK = [
-    "Near-fully-overlapping objects can still merge - inherent to watershed; a "
-    "learned instance-embedding + clustering head would push this further.",
-    "Class-agnostic: it segments 'objects', not categories. The COCO subset is "
-    "therefore treated as generic foreground, not 80 classes.",
-    "Validation is noisy (a small held-out split) and uses foreground IoU - an "
-    "official COCO-style AP would be a fairer, more comparable number.",
-    "Trained from scratch on modest data; a longer schedule or a "
-    "segmentation-pretrained initialisation would likely improve masks.",
-    "Test-time augmentation exists but is off by default; enabling it should "
-    "sharpen boundaries at some cost in latency.",
-    "Several hyper-parameters are fixed defaults (centre-target sigma, "
-    "peak min-distance, boundary weight) and could be tuned per dataset.",
-    "Mixed precision is wired but could not be exercised on a GPU here, so its "
-    "GPU behaviour is unverified in this environment.",
+    "Near-fully-overlapping objects can still merge. An instance-embedding head now exists "
+    "(--embed-dim, 'hybrid' mode) but after tuning it did not beat plain watershed - still open.",
+    "Class-agnostic: it segments 'objects', not categories (unchanged by design).",
+    "Evaluation: tools/eval_ap.py now reports COCO-style AP (cross-fitted). Result: AP50 ~4-6 %, "
+    "strict AP ~0 - instance quality is low. The 60-image val split is still small/noisy.",
+    "Training: pretrained init + a 40-epoch schedule on 872 images raised foreground IoU to "
+    "0.44, but did not raise instance AP; more consistent data / a larger GPU run is next.",
+    "Test-time augmentation measured: 1-flip ~+0.1 AP50 for ~1.7x latency, 4-flip worse; "
+    "left off by default (selectable per request).",
+    "Post-processing hyper-parameters are tuned per checkpoint (weights/postproc*.json); "
+    "the tuner is fit on the same small val split, so the gains are approximate.",
+    "Mixed precision: losses are float32 and a CPU bf16 check passes, but the GPU fp16 "
+    "GradScaler path is still unverified here.",
 ]
 
 
@@ -226,7 +227,7 @@ def build_report(model, cfg, metrics, checks, ckpt_used, ckpt_meta, size, args):
     L.append("```bash")
     L.append("python install_requirements.py          # dependencies")
     L.append("python train.py --size 256 --batch 1 --grad-accum 8 --amp")
-    L.append("python test_all.py                      # 27 self-checks")
+    L.append("python test_all.py                      # 30 self-checks")
     L.append("python benchmark.py --models light large --epochs 3")
     L.append("python report.py                        # this report")
     L.append("```")

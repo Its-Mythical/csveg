@@ -9,6 +9,12 @@ async function health() {
     if (j.model_loaded) {
       el.textContent = `model ready · ${j.params_millions}M params · ${j.img_size}px`;
       el.className = "status ok";
+      // start the sliders at the post-processing settings tuned for this model (if any)
+      const p = j.postproc || {};
+      [["fg_thr", "fg_out", 2], ["ctr_thr", "ctr_out", 2],
+       ["bnd_weight", "bnd_out", 2], ["min_area", "area_out", 0]].forEach(([id, out, d]) => {
+        if (p[id] !== undefined) { $(id).value = p[id]; $(out).textContent = (+p[id]).toFixed(d); }
+      });
     } else {
       el.textContent = j.error || "no trained model";
       el.className = "status err";

@@ -1,0 +1,13 @@
+{
+  "size": 320,
+  "tta": "none",
+  "mode": "watershed",
+  "fg_thr": 0.5,
+  "ctr_thr": 0.35,
+  "bnd_weight": 0.7,
+  "min_distance": 11,
+  "min_area": 80,
+  "emb_weight": 1.0,
+  "emb_spatial": 5.0,
+  "score": "fg"
+}

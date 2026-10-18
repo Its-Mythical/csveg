@@ -1,0 +1,65 @@
+data: 872 images [penn=170] [balloon=74] [carparts=250] [coco_seg=128] [package=250]
+train=812 val=60 device=cpu
+batches/epoch=101 grad_accum=1
+model: resnet18 width=1.0 | 12.06 M trainable params | amp=False | pretrained=True train_bn=False embed_dim=8
+epoch 1/40 loss 3.8607 val_fgIoU 0.0000 * t=112s
+  [ckpt] step 200 saved
+epoch 2/40 loss 3.4580 val_fgIoU 0.0004 * t=207s
+epoch 3/40 loss 3.2901 val_fgIoU 0.0124 * t=302s
+  [ckpt] step 400 saved
+epoch 4/40 loss 3.2302 val_fgIoU 0.1262 * t=398s
+epoch 5/40 loss 3.2570 val_fgIoU 0.0476 t=492s
+  [ckpt] step 600 saved
+epoch 6/40 loss 3.1862 val_fgIoU 0.1244 t=591s
+epoch 7/40 loss 3.1927 val_fgIoU 0.1382 * t=697s
+  [ckpt] step 800 saved
+epoch 8/40 loss 3.1827 val_fgIoU 0.1393 * t=798s
+epoch 9/40 loss 3.1608 val_fgIoU 0.0510 t=897s
+  [ckpt] step 1000 saved
+epoch 10/40 loss 3.1662 val_fgIoU 0.2955 * t=997s
+epoch 11/40 loss 3.1266 val_fgIoU 0.2608 t=1099s
+  [ckpt] step 1200 saved
+epoch 12/40 loss 3.1103 val_fgIoU 0.2534 t=1199s
+epoch 13/40 loss 3.1483 val_fgIoU 0.1844 t=1297s
+  [ckpt] step 1400 saved
+epoch 14/40 loss 3.0666 val_fgIoU 0.2293 t=1397s
+epoch 15/40 loss 3.0878 val_fgIoU 0.1932 t=1495s
+  [ckpt] step 1600 saved
+epoch 16/40 loss 3.0932 val_fgIoU 0.2935 t=1590s
+epoch 17/40 loss 3.0135 val_fgIoU 0.0812 t=1688s
+  [ckpt] step 1800 saved
+epoch 18/40 loss 3.0405 val_fgIoU 0.3225 * t=1786s
+epoch 19/40 loss 2.9829 val_fgIoU 0.3310 * t=1885s
+  [ckpt] step 2000 saved
+epoch 20/40 loss 2.9557 val_fgIoU 0.3240 t=1986s
+epoch 21/40 loss 2.9239 val_fgIoU 0.2961 t=2089s
+  [ckpt] step 2200 saved
+epoch 22/40 loss 2.9250 val_fgIoU 0.3598 * t=2188s
+epoch 23/40 loss 2.8892 val_fgIoU 0.3182 t=2287s
+  [ckpt] step 2400 saved
+epoch 24/40 loss 2.8368 val_fgIoU 0.3680 * t=2388s
+epoch 25/40 loss 2.7975 val_fgIoU 0.3850 * t=2494s
+  [ckpt] step 2600 saved
+epoch 26/40 loss 2.7998 val_fgIoU 0.4047 * t=2600s
+epoch 27/40 loss 2.7445 val_fgIoU 0.3895 t=2701s
+  [ckpt] step 2800 saved
+epoch 28/40 loss 2.6733 val_fgIoU 0.4069 * t=2800s
+epoch 29/40 loss 2.6394 val_fgIoU 0.4068 t=2900s
+  [ckpt] step 3000 saved
+epoch 30/40 loss 2.6025 val_fgIoU 0.4147 * t=2999s
+epoch 31/40 loss 2.5827 val_fgIoU 0.4225 * t=3097s
+  [ckpt] step 3200 saved
+epoch 32/40 loss 2.5852 val_fgIoU 0.4240 * t=3200s
+epoch 33/40 loss 2.5181 val_fgIoU 0.4173 t=3299s
+  [ckpt] step 3400 saved
+epoch 34/40 loss 2.5605 val_fgIoU 0.4302 * t=3397s
+epoch 35/40 loss 2.5734 val_fgIoU 0.4268 t=3498s
+  [ckpt] step 3600 saved
+epoch 36/40 loss 2.5569 val_fgIoU 0.4358 * t=3593s
+epoch 37/40 loss 2.5013 val_fgIoU 0.4351 t=3689s
+  [ckpt] step 3800 saved
+epoch 38/40 loss 2.5067 val_fgIoU 0.4327 t=3789s
+epoch 39/40 loss 2.4630 val_fgIoU 0.4349 t=3891s
+  [ckpt] step 4000 saved
+epoch 40/40 loss 2.4679 val_fgIoU 0.4346 t=3991s
+done. best val fg IoU 0.4358 -> /tmp/claude-0/-home-claude-csveg/404e2909-cc38-5590-9f5e-b1b97437aa36/scratchpad/run_imp2/weights/cvseg_unet.pt

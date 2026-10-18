@@ -23,12 +23,15 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from model import (CVSegNet, extract_instances, instance_color_map,
-                   instance_palette, predict)
+                   instance_palette, load_postproc, predict)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(ROOT, "static")
 WEIGHTS = os.environ.get("CVSEG_WEIGHTS", os.path.join(ROOT, "weights", "cvseg_unet.pt"))
-IMG_SIZE = int(os.environ.get("CVSEG_IMG_SIZE", "320"))
+# post-processing settings tuned on validation AP by tools/eval_ap.py (optional file)
+POSTPROC = os.environ.get("CVSEG_POSTPROC", os.path.join(ROOT, "weights", "postproc.json"))
+CFG = load_postproc(POSTPROC)
+IMG_SIZE = int(os.environ.get("CVSEG_IMG_SIZE", CFG["size"]))
 
 torch.set_num_threads(2)
 
@@ -47,7 +50,9 @@ def load_model():
     sd = ck["model"] if isinstance(ck, dict) and "model" in ck else ck
     backbone = ck.get("backbone", "resnet18") if isinstance(ck, dict) else "resnet18"
     width = ck.get("decoder_width", 1.0) if isinstance(ck, dict) else 1.0
-    model = CVSegNet(pretrained=False, backbone=backbone, decoder_width=width)
+    embed_dim = ck.get("embed_dim", 0) if isinstance(ck, dict) else 0
+    model = CVSegNet(pretrained=False, backbone=backbone, decoder_width=width,
+                     embed_dim=embed_dim)
     model.load_state_dict(sd)
     model.eval()
     _state["model"] = model
@@ -76,7 +81,8 @@ def health():
     _ensure_loaded()
     m = _state["model"]
     return {"model_loaded": m is not None, "error": _state["error"],
-            "img_size": IMG_SIZE,
+            "img_size": IMG_SIZE, "postproc": CFG,
+            "embedding_head": bool(m and m.embed_dim > 0),
             "params_millions": round(sum(p.numel() for p in m.parameters()) / 1e6, 2) if m else None}
 
 
@@ -95,7 +101,8 @@ def _overlay_rgba(rgb: np.ndarray, labels: np.ndarray, alpha: int = 200) -> str:
 @app.post("/api/segment")
 async def segment(file: UploadFile = File(...), fg_thr: float = Form(0.5),
                   ctr_thr: float = Form(0.35), bnd_weight: float = Form(0.7),
-                  min_area: int = Form(40)):
+                  min_area: int = Form(40), tta: str | None = Form(None),
+                  mode: str | None = Form(None)):
     _ensure_loaded()
     if _state["model"] is None:
         return JSONResponse(status_code=503, content={"error": _state["error"]})
@@ -107,10 +114,22 @@ async def segment(file: UploadFile = File(...), fg_thr: float = Form(0.5),
         return JSONResponse(status_code=400, content={"error": "Could not read that image."})
 
     arr = np.array(img)
-    fg, ctr, bnd = predict(_state["model"], arr, size=IMG_SIZE)
-    labels, instances = extract_instances(fg, ctr, bnd, fg_thr=fg_thr,
-                                          ctr_thr=ctr_thr, bnd_weight=bnd_weight,
-                                          min_area=min_area)
+    # sliders override the tuned defaults; tta / mode / min_distance are API-only options
+    p = {**CFG, "fg_thr": fg_thr, "ctr_thr": ctr_thr, "bnd_weight": bnd_weight,
+         "min_area": min_area}
+    if tta is not None:
+        p["tta"] = tta
+    if mode is not None:
+        p["mode"] = mode
+    has_emb = _state["model"].embed_dim > 0
+    out = predict(_state["model"], arr, size=IMG_SIZE, tta=p["tta"], return_embed=has_emb)
+    fg, ctr, bnd = out[:3]
+    labels, instances = extract_instances(
+        fg, ctr, bnd, fg_thr=p["fg_thr"], ctr_thr=p["ctr_thr"], bnd_weight=p["bnd_weight"],
+        min_area=p["min_area"], min_distance=p["min_distance"],
+        embed=out[3] if has_emb else None,
+        mode=p["mode"] if has_emb else "watershed",
+        emb_weight=p["emb_weight"], emb_spatial=p["emb_spatial"], score=p["score"])
 
     palette = instance_palette(int(labels.max()))
     for inst in instances:

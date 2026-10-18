@@ -1,0 +1,90 @@
+data: 872 images [penn=170] [balloon=74] [carparts=250] [coco_seg=128] [package=250]
+train=812 val=60 device=cpu
+batches/epoch=203 grad_accum=1
+model: resnet18 width=1.0 | 12.06 M trainable params | amp=False
+  [ckpt] step 200 saved
+epoch 1/40 loss 2.9484 val_fgIoU 0.0586 * t=112s
+  [ckpt] step 400 saved
+epoch 2/40 loss 2.9257 val_fgIoU 0.0343 t=894s
+  [ckpt] step 600 saved
+epoch 3/40 loss 2.8861 val_fgIoU 0.1293 * t=1012s
+  [ckpt] step 800 saved
+epoch 4/40 loss 2.8352 val_fgIoU 0.1873 * t=1131s
+  [ckpt] step 1000 saved
+epoch 5/40 loss 2.8565 val_fgIoU 0.1194 t=1251s
+  [ckpt] step 1200 saved
+epoch 6/40 loss 2.8359 val_fgIoU 0.1052 t=1372s
+  [ckpt] step 1400 saved
+epoch 7/40 loss 2.8075 val_fgIoU 0.1588 t=1496s
+  [ckpt] step 1600 saved
+epoch 8/40 loss 2.7723 val_fgIoU 0.2013 * t=1617s
+  [ckpt] step 1800 saved
+epoch 9/40 loss 2.7966 val_fgIoU 0.0012 t=1742s
+  [ckpt] step 2000 saved
+epoch 10/40 loss 2.7833 val_fgIoU 0.3093 * t=2547s
+  [ckpt] step 2200 saved
+epoch 11/40 loss 2.7877 val_fgIoU 0.2894 t=3496s
+  [ckpt] step 2400 saved
+epoch 12/40 loss 2.7480 val_fgIoU 0.2533 t=3618s
+data: 872 images [penn=170] [balloon=74] [carparts=250] [coco_seg=128] [package=250]
+train=812 val=60 device=cpu
+batches/epoch=203 grad_accum=1
+model: resnet18 width=1.0 | 12.06 M trainable params | amp=False
+resumed cvseg_last.pt: epoch 12, 0/203 batches done, global_step 2436, best 0.309, lr 7.94e-04
+  [ckpt] step 2600 saved
+epoch 13/40 loss 2.7169 val_fgIoU 0.3002 t=133s
+  [ckpt] step 2800 saved
+epoch 14/40 loss 2.6711 val_fgIoU 0.3329 * t=241s
+  [ckpt] step 3000 saved
+epoch 15/40 loss 2.7110 val_fgIoU 0.2964 t=351s
+  [ckpt] step 3200 saved
+epoch 16/40 loss 2.6909 val_fgIoU 0.3243 t=464s
+  [ckpt] step 3400 saved
+epoch 17/40 loss 2.6704 val_fgIoU 0.3221 t=577s
+  [ckpt] step 3600 saved
+epoch 18/40 loss 2.6214 val_fgIoU 0.2295 t=690s
+  [ckpt] step 3800 saved
+epoch 19/40 loss 2.6591 val_fgIoU 0.3414 * t=803s
+  [ckpt] step 4000 saved
+epoch 20/40 loss 2.6384 val_fgIoU 0.3401 t=915s
+  [ckpt] step 4200 saved
+epoch 21/40 loss 2.6383 val_fgIoU 0.3109 t=1032s
+  [ckpt] step 4400 saved
+epoch 22/40 loss 2.5968 val_fgIoU 0.3400 t=1145s
+  [ckpt] step 4600 saved
+epoch 23/40 loss 2.6079 val_fgIoU 0.3004 t=1265s
+  [ckpt] step 4800 saved
+epoch 24/40 loss 2.6037 val_fgIoU 0.3514 * t=1392s
+  [ckpt] step 5000 saved
+epoch 25/40 loss 2.5827 val_fgIoU 0.3588 * t=1513s
+  [ckpt] step 5200 saved
+epoch 26/40 loss 2.5529 val_fgIoU 0.3517 t=1634s
+  [ckpt] step 5400 saved
+epoch 27/40 loss 2.5493 val_fgIoU 0.3440 t=1752s
+  [ckpt] step 5600 saved
+epoch 28/40 loss 2.5357 val_fgIoU 0.3749 * t=1867s
+  [ckpt] step 5800 saved
+epoch 29/40 loss 2.5149 val_fgIoU 0.3596 t=1979s
+  [ckpt] step 6000 saved
+epoch 30/40 loss 2.5007 val_fgIoU 0.3369 t=2090s
+  [ckpt] step 6200 saved
+epoch 31/40 loss 2.5227 val_fgIoU 0.3474 t=2202s
+  [ckpt] step 6400 saved
+epoch 32/40 loss 2.5138 val_fgIoU 0.3639 t=2315s
+  [ckpt] step 6600 saved
+epoch 33/40 loss 2.4623 val_fgIoU 0.3565 t=2428s
+  [ckpt] step 6800 saved
+epoch 34/40 loss 2.4894 val_fgIoU 0.3499 t=2538s
+  [ckpt] step 7000 saved
+epoch 35/40 loss 2.4247 val_fgIoU 0.3601 t=2652s
+  [ckpt] step 7200 saved
+epoch 36/40 loss 2.4280 val_fgIoU 0.3692 t=2767s
+  [ckpt] step 7400 saved
+epoch 37/40 loss 2.4623 val_fgIoU 0.3593 t=2881s
+  [ckpt] step 7600 saved
+epoch 38/40 loss 2.4393 val_fgIoU 0.3604 t=2996s
+  [ckpt] step 7800 saved
+epoch 39/40 loss 2.4128 val_fgIoU 0.3598 t=3107s
+  [ckpt] step 8000 saved
+epoch 40/40 loss 2.4616 val_fgIoU 0.3596 t=3216s
+done. best val fg IoU 0.3749 -> /tmp/claude-0/-home-claude-csveg/404e2909-cc38-5590-9f5e-b1b97437aa36/scratchpad/run_ctl/weights/cvseg_unet.pt
