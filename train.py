@@ -378,13 +378,37 @@ def main():
         opt.load_state_dict(ck["opt"])
         if ck.get("scaler"):
             scaler.load_state_dict(ck["scaler"])
-        if ck.get("sched"):
-            sched.load_state_dict(ck["sched"])
         start_epoch = ck.get("epoch", 0)
         resume_batches = ck.get("batch_in_epoch", 0)
-        global_step = ck.get("global_step", 0)
         best = ck.get("best", 0.0)
         _restore_rng(ck.get("rng"))
+
+        if ck.get("sched"):
+            sched.load_state_dict(ck["sched"])
+        else:
+            # Older checkpoints (written before this field existed) carry no
+            # scheduler state. The optimiser state restores the *current* LR, but
+            # the scheduler's own clock is still at 0, so the next sched.step()
+            # would jump the LR back up to its starting value. Advance the
+            # scheduler to the checkpoint's epoch to stay on the same curve.
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                for _ in range(start_epoch):
+                    sched.step()
+            print(f"  note: checkpoint had no scheduler state; LR schedule "
+                  f"advanced to epoch {start_epoch}", flush=True)
+
+        global_step = ck.get("global_step")
+        if not global_step:
+            global_step = start_epoch * batches_per_epoch // max(1, args.grad_accum)
+            if global_step:
+                print(f"  note: checkpoint had no global_step; estimated "
+                      f"{global_step}", flush=True)
+        if not ck.get("meta"):
+            print("  note: checkpoint has no config metadata (older format)",
+                  flush=True)
+
         print(f"resumed {os.path.basename(resume_path)}: epoch {start_epoch}, "
               f"{resume_batches}/{batches_per_epoch} batches done, "
               f"global_step {global_step}, best {best:.3f}, "

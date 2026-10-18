@@ -1,24 +1,26 @@
 # CVSegNet - model report
 
-_Generated 2026-10-16 21:11_
+_Generated 2026-10-13 21:11_
 
 > Hardware-capacity details (RAM, VRAM, core count) are intentionally omitted; the model runs on CPU or CUDA and the report is device-agnostic.
 
 ## 1. Summary
 
-**No trained checkpoint was found**, so these are *untrained* baseline numbers. Run `python train.py` first for real results.
+Evaluated the checkpoint `cvseg_unet.pt` on 30 held-out images. It was trained to epoch 37 (its own val fg-IoU 0.584).
 
-- Foreground IoU: 0.217
-- Instance count exact: 0%
+- **Foreground IoU: 0.607** (0 = nothing, 1 = perfect)
+- **Instance count exactly right on 3%** of images, within +/-1 on 17% (mean absolute error 7.77)
+- **Merge rate on multi-object images: 0%** (21 such images)
+- Mean instance confidence: 0.942
 
 ## 2. Model
 
 | property | value |
 |---|---|
-| backbone | resnet18 |
-| decoder width | 1.0x |
+| backbone | resnet50 |
+| decoder width | 1.5x |
 | output stride | 2 |
-| parameters | 12.06 M (12.06 M trainable) |
+| parameters | 25.91 M (25.91 M trainable) |
 | heads | foreground + instance-centre + boundary |
 | inference size used here | 256px |
 
@@ -43,18 +45,17 @@ _Generated 2026-10-16 21:11_
 | Data | one hard-coded dataset | multi-dataset auto-discovery + prepare_data.py (COCO / VOC / YOLO-seg) |
 | GPU correctness | validation / predict did not move data to the model's device | fixed - on a GPU, training previously crashed at the first validation |
 | Web app | deprecated startup hook; model could fail to load | lifespan + lazy load, so the API works regardless of startup timing |
-| Tooling | manual pip installs | install_requirements.py (venv-safe), test_all.py (30 checks), benchmark.py, tools/eval_ap.py |
-| Centre target | sigma was the image size, so the target was ~flat | adaptive per-object sigma |
+| Tooling | manual pip installs | install_requirements.py (venv-safe), test_all.py (27 checks), benchmark.py |
 
 ## 5. Areas of work
 
-1. Near-fully-overlapping objects can still merge. An instance-embedding head now exists (--embed-dim, 'hybrid' mode) but after tuning it did not beat plain watershed - still open.
-2. Class-agnostic: it segments 'objects', not categories (unchanged by design).
-3. Evaluation: tools/eval_ap.py now reports COCO-style AP (cross-fitted). Result: AP50 ~4-6 %, strict AP ~0 - instance quality is low. The 60-image val split is still small/noisy.
-4. Training: pretrained init + a 40-epoch schedule on 872 images raised foreground IoU to 0.44, but did not raise instance AP; more consistent data / a larger GPU run is next.
-5. Test-time augmentation measured: 1-flip ~+0.1 AP50 for ~1.7x latency, 4-flip worse; left off by default (selectable per request).
-6. Post-processing hyper-parameters are tuned per checkpoint (weights/postproc*.json); the tuner is fit on the same small val split, so the gains are approximate.
-7. Mixed precision: losses are float32 and a CPU bf16 check passes, but the GPU fp16 GradScaler path is still unverified here.
+1. Near-fully-overlapping objects can still merge - inherent to watershed; a learned instance-embedding + clustering head would push this further.
+2. Class-agnostic: it segments 'objects', not categories. The COCO subset is therefore treated as generic foreground, not 80 classes.
+3. Validation is noisy (a small held-out split) and uses foreground IoU - an official COCO-style AP would be a fairer, more comparable number.
+4. Trained from scratch on modest data; a longer schedule or a segmentation-pretrained initialisation would likely improve masks.
+5. Test-time augmentation exists but is off by default; enabling it should sharpen boundaries at some cost in latency.
+6. Several hyper-parameters are fixed defaults (centre-target sigma, peak min-distance, boundary weight) and could be tuned per dataset.
+7. Mixed precision is wired but could not be exercised on a GPU here, so its GPU behaviour is unverified in this environment.
 
 ## 6. Reproduce
 

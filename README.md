@@ -1,4 +1,4 @@
-# CVSegNet — instance segmentation (fixed + improved)
+#  CVSegNet — instance segmentation (fixed + improved)
 
 A self-contained instance-segmentation project: a model, training data, a
 training script and a web app. Upload an image and the app finds each distinct

@@ -123,6 +123,8 @@ def collect_metrics(model, val_items, size, ctr_thr=0.35, min_area=40):
     abs_err = 0.0
     merges = 0
     multi_gt = 0
+    pred_total = 0
+    gt_total = 0
     scores = []
     model.eval()
     for it in val_items:
@@ -131,6 +133,8 @@ def collect_metrics(model, val_items, size, ctr_thr=0.35, min_area=40):
         _, inst = extract_instances(fg, ctr, bnd, ctr_thr=ctr_thr, min_area=min_area)
         gt = _gt_count(it[1])
         pred = len(inst)
+        pred_total += pred
+        gt_total += gt
         if pred == gt:
             exact += 1
         if abs(pred - gt) <= 1:
@@ -152,6 +156,8 @@ def collect_metrics(model, val_items, size, ctr_thr=0.35, min_area=40):
         "merge_rate": (merges / multi_gt) if multi_gt else 0.0,
         "multi_gt": multi_gt,
         "mean_score": float(np.mean(scores)) if scores else 0.0,
+        "mean_pred": pred_total / n,
+        "mean_gt": gt_total / n,
     }
 
 
@@ -184,7 +190,16 @@ def build_report(model, cfg, metrics, checks, ckpt_used, ckpt_meta, size, args):
                  f"(mean absolute error {metrics['count_mae']:.2f})")
         L.append(f"- **Merge rate on multi-object images: {metrics['merge_rate']*100:.0f}%** "
                  f"({metrics['multi_gt']} such images)")
-        L.append(f"- Mean instance confidence: {metrics['mean_score']:.3f}\n")
+        L.append(f"- Mean instance confidence: {metrics['mean_score']:.3f}")
+        mp, mg = metrics.get("mean_pred", 0), metrics.get("mean_gt", 0)
+        if mg and mp > mg * 1.5:
+            L.append(f"- **Tends to over-segment**: {mp:.1f} instances predicted vs "
+                     f"{mg:.1f} true on average - raise `ctr_thr` / `min_area`, or "
+                     f"train longer")
+        elif mg and mp < mg * 0.6:
+            L.append(f"- **Tends to under-segment**: {mp:.1f} predicted vs {mg:.1f} "
+                     f"true on average - lower `ctr_thr` / `min_area`")
+        L.append("")
     else:
         L.append("**No trained checkpoint was found**, so these are *untrained* "
                  "baseline numbers. Run `python train.py` first for real results.\n")
